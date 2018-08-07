@@ -1,0 +1,16 @@
+## Title: |c8794C5SlippyCheeze's|r Read It Once
+## Description: Skips reading books, and shows an alert instead, when you open them for the second time.
+## Author: |c8794C5SlippyCheeze|r
+## Version: 1
+## AddonVersions: 1
+## APIVersion: 100023 100024
+## SavedVariables: SlippyCheezeReadItOnceData
+
+SlippyCheezeReadItOnce.lua
+
+
+# This Add-on is not created by, affiliated with or sponsored by ZeniMax
+# Media Inc. or its affiliates. The Elder Scrolls® and related logos are
+# registered trademarks or trademarks of ZeniMax Media Inc. in the United
+# States and/or other countries. All rights reserved.
+# You can read the full terms at https://account.elderscrollsonline.com/add-on-terms
