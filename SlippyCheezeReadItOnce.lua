@@ -3,6 +3,10 @@
 
 -- addon core object.
 local ADDON_NAME = "SlippyCheezeReadItOnce"
+local DISPLAY_NAME = "Read It Once"
+
+local DOUBLE_TAP_TIME = 750
+local previousBook = {id=nil, time=0}
 
 -- saved var: which books have been seen.
 local seen
@@ -60,8 +64,34 @@ end
 --
 -- The HaveSeenBook logic is my addition.
 local function OnShowBookOverride(eventCode, title, body, medium, showTitle, bookId)
-   if HaveSeenBookBefore(bookId, title, body) then
-      ZO_Alert(UI_ALERT_CATEGORY_ALERT, SOUNDS.BOOK_ACQUIRED, "You have already read \"<<1>>\"", title)
+   -- are we overriding our blocking?
+   local override = false
+   local now = GetGameTimeMilliseconds()
+   if previousBook.id == bookId then
+      if (now - previousBook.time) < DOUBLE_TAP_TIME then
+         override = true
+      end
+   else
+      previousBook.id = bookId
+   end
+   -- dmsg("override <<1>> now <<2>> prev.time <<3>> deltaT <<4>> prev.id <<5>> id <<6>>",
+   --      override, now, previousBook.time, now - previousBook.time, previousBook.id, id)
+   previousBook.time = now
+
+   if HaveSeenBookBefore(bookId, title, body) and not override then
+      PlaySound(SOUNDS.NEGATIVE_CLICK)
+
+      -- local msg = zo_strformat("<<1>>: You have already read \"<<2>>\"", DISPLAY_NAME, title)
+      local msg = zo_strformat("You have already read \"<<1>>\"", title)
+
+      -- ZO_AlertNoSuppression(UI_ALERT_CATEGORY_ALERT, nil, )
+
+      local params = CENTER_SCREEN_ANNOUNCE:CreateMessageParams(CSA_CATEGORY_SMALL_TEXT, nil)
+      params:SetText(msg)
+      params:SetCSAType(CENTER_SCREEN_ANNOUNCE_TYPE_LORE_BOOK_LEARNED)
+      params:SetLifespanMS(850)
+      CENTER_SCREEN_ANNOUNCE:AddMessageWithParams(params)
+
       EndInteraction(INTERACTION_BOOK)
       return
    end
