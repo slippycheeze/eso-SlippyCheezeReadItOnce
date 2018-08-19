@@ -1,0 +1,16 @@
+style: github
+template: CHANGELOG.tpl.md
+info:
+  title: SlippyCheeze's Read It Once
+  repository_url: https://github.com/slippycheeze/eso-SlippyCheezeReadItOnce
+options:
+  header:
+    pattern: "^(.*)$"
+    pattern_maps:
+      - Subject
+  commit_groups:
+    group_by: Subject
+  commit:
+    sort_by: Author.Date
+
+
