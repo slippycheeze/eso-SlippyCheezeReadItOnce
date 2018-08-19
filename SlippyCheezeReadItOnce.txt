@@ -1,9 +1,9 @@
 ## Title: |c8794C5SlippyCheeze's|r Read It Once
-## Description: Skips reading books, and shows an alert instead, when you open them for the second time.
+## Description: Skips reading books when you open them for the second time.
 ## Author: |c8794C5SlippyCheeze|r
-## Version: 2
-## AddonVersions: 2
-## APIVersion: 100023 100024
+## Version: 1000000-DEV
+## AddOnVersion: 1000000
+## APIVersion: 100024
 ## SavedVariables: SlippyCheezeReadItOnceData
 
 SlippyCheezeReadItOnce.lua
