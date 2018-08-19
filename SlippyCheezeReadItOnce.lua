@@ -5,7 +5,7 @@
 local ADDON_NAME = "SlippyCheezeReadItOnce"
 local DISPLAY_NAME = "Read It Once"
 
-local DOUBLE_TAP_TIME = 750
+local DOUBLE_TAP_TIME = 1000
 local previousBook = {id=nil, time=0}
 
 -- saved var: which books have been seen.
