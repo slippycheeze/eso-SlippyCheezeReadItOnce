@@ -64,21 +64,26 @@ end
 --
 -- The HaveSeenBook logic is my addition.
 local function OnShowBookOverride(eventCode, title, body, medium, showTitle, bookId)
-   -- are we overriding our blocking?
-   local override = false
+   -- by default, only block books when we are in the default in-game
+   -- interaction mode, so that inventory, lore journal, etc, activations do
+   -- not get blocked.
+   local force_show = not SCENE_MANAGER:IsShowingBaseScene()
+
+   -- handle the case of double-activation to bypass the restriction.
    local now = GetGameTimeMilliseconds()
    if previousBook.id == bookId then
       if (now - previousBook.time) < DOUBLE_TAP_TIME then
-         override = true
+         force_show = true
       end
    else
       previousBook.id = bookId
    end
-   -- dmsg("override <<1>> now <<2>> prev.time <<3>> deltaT <<4>> prev.id <<5>> id <<6>>",
-   --      override, now, previousBook.time, now - previousBook.time, previousBook.id, id)
+   -- dmsg("force_show <<1>> now <<2>> prev.time <<3>> deltaT <<4>> prev.id <<5>> id <<6>>",
+   --      force_show, now, previousBook.time, now - previousBook.time, previousBook.id, id)
    previousBook.time = now
 
-   if HaveSeenBookBefore(bookId, title, body) and not override then
+   -- implement the block, if appropriate.
+   if HaveSeenBookBefore(bookId, title, body) and not force_show then
       PlaySound(SOUNDS.NEGATIVE_CLICK)
 
       -- local msg = zo_strformat("<<1>>: You have already read \"<<2>>\"", DISPLAY_NAME, title)
@@ -96,6 +101,7 @@ local function OnShowBookOverride(eventCode, title, body, medium, showTitle, boo
       return
    end
 
+   -- meh, this is copied from the local function in the ZOS code. :(
    if LORE_READER:Show(title, body, medium, showTitle) then
       PlaySound(LORE_READER.OpenSound)
    else
@@ -104,10 +110,7 @@ local function OnShowBookOverride(eventCode, title, body, medium, showTitle, boo
 end
 
 local function OnAddonLoaded(_, name)
-   if name ~= ADDON_NAME then
-      return
-   end
-
+   if name ~= ADDON_NAME then return end
    EVENT_MANAGER:UnregisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED)
 
    -- if the second argument, the version, changes then the data is wiped and
