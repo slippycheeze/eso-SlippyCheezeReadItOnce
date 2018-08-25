@@ -1,32 +1,36 @@
 -- Copyright © 2018 Daniel Pittman <daniel@rimspace.net>
 -- See LICENSE for more details.
+if not SlippyCheezeReadItOnce then
+      SlippyCheezeReadItOnce = {
+         ADDON_NAME="SlippyCheezeReadItOnce",
+         DISPLAY_NAME = "|c798BD2ReadItOnce|r",
+         DOUBLE_TAP_TIME = 1000,
+         previousBook = {id=nil, time=0},
+         -- seen holds our saved variables.
+         seen = {}
+      }
+end
 
--- addon core object.
-local ADDON_NAME = "SlippyCheezeReadItOnce"
-local DISPLAY_NAME = "Read It Once"
-
-local DOUBLE_TAP_TIME = 1000
-local previousBook = {id=nil, time=0}
-
--- saved var: which books have been seen.
-local seen
+-- my local alias for the addon itself.
+local M = SlippyCheezeReadItOnce
 
 local unpack = table.unpack or unpack
 local insert = table.insert
-local function dmsg(msg, ...)
+
+local function msg(msg, ...)
    local args = {}
    for n=1, select('#', ...) do
       insert(args, tostring(select(n, ...)))
    end
 
-   d(zo_strformat(msg, unpack(args)))
+   d(DISPLAY_NAME..": "..zo_strformat(msg, unpack(args)))
 end
 
 -- return bool, have we seen this before.  never called before saved variables
 -- are loaded and initialized.
-local function HaveSeenBookBefore(id, title, body)
+function M:HaveSeenBookBefore(self, id, title, body)
    if type(id) ~= "number" then
-      dmsg("ReadItOnce: id is <<1>> (<<2>>)", type(id), id)
+      msg("ReadItOnce: id is <<1>> (<<2>>)", type(id), id)
       return false
    end
 
@@ -34,7 +38,7 @@ local function HaveSeenBookBefore(id, title, body)
    local id = tostring(id)
    local bodyHash = HashString(body)
 
-   local record = seen[id]
+   local record = self.seen[id]
    if record then
       -- probably have seen it before, but check for changes
       if record.id ~= id then
@@ -52,8 +56,27 @@ local function HaveSeenBookBefore(id, title, body)
    end
 
    -- have not seen, record it, and return that fact
-   seen[id] = {id=id, title=title, bodyHash=bodyHash}
+   self.seen[id] = {id=id, title=title, bodyHash=bodyHash}
    return false
+end
+
+-- Called when we want to skip showing a book.  Probably going to be very
+-- strange if you call it any other time!
+function M:DoNotShowThisBook(self)
+   PlaySound(SOUNDS.NEGATIVE_CLICK)
+
+   -- local msg = zo_strformat("<<1>>: You have already read \"<<2>>\"", DISPLAY_NAME, title)
+   local msg = zo_strformat("You have already read \"<<1>>\"", title)
+
+   -- ZO_AlertNoSuppression(UI_ALERT_CATEGORY_ALERT, nil, )
+
+   local params = CENTER_SCREEN_ANNOUNCE:CreateMessageParams(CSA_CATEGORY_SMALL_TEXT, nil)
+   params:SetText(msg)
+   params:SetCSAType(CENTER_SCREEN_ANNOUNCE_TYPE_LORE_BOOK_LEARNED)
+   params:SetLifespanMS(850)
+   CENTER_SCREEN_ANNOUNCE:AddMessageWithParams(params)
+
+   EndInteraction(INTERACTION_BOOK)
 end
 
 -- Sadly, we have to override the original method, which is a local anonymous
@@ -63,42 +86,30 @@ end
 -- 100023
 --
 -- The HaveSeenBook logic is my addition.
-local function OnShowBookOverride(eventCode, title, body, medium, showTitle, bookId)
-   -- by default, only block books when we are in the default in-game
-   -- interaction mode, so that inventory, lore journal, etc, activations do
-   -- not get blocked.
-   local force_show = not SCENE_MANAGER:IsShowingBaseScene()
+function M:OnShowBookOverride(eventCode, title, body, medium, showTitle, bookId)
+   local do_not_show = false
 
-   -- handle the case of double-activation to bypass the restriction.
-   local now = GetGameTimeMilliseconds()
-   if previousBook.id == bookId then
-      if (now - previousBook.time) < DOUBLE_TAP_TIME then
-         force_show = true
+   -- never block a book if we are not in the most basic state, which is the
+   -- world interaction state.
+   if SCENE_MANAGER:IsShowingBaseScene() then
+      -- handle the case of double-activation to bypass the restriction.
+      local now = GetGameTimeMilliseconds()
+      if previousBook.id == bookId then
+         if (now - previousBook.time) > DOUBLE_TAP_TIME then
+            do_not_show = true
+         end
+      else
+         previousBook.id = bookId
       end
-   else
-      previousBook.id = bookId
+      -- msg("force_show <<1>> now <<2>> prev.time <<3>> deltaT <<4>> prev.id <<5>> id <<6>>",
+      --      force_show, now, previousBook.time, now - previousBook.time, previousBook.id, id)
+      previousBook.time = now
+   else -- not in the base scene
+      do_not_show = true
    end
-   -- dmsg("force_show <<1>> now <<2>> prev.time <<3>> deltaT <<4>> prev.id <<5>> id <<6>>",
-   --      force_show, now, previousBook.time, now - previousBook.time, previousBook.id, id)
-   previousBook.time = now
 
    -- implement the block, if appropriate.
    if HaveSeenBookBefore(bookId, title, body) and not force_show then
-      PlaySound(SOUNDS.NEGATIVE_CLICK)
-
-      -- local msg = zo_strformat("<<1>>: You have already read \"<<2>>\"", DISPLAY_NAME, title)
-      local msg = zo_strformat("You have already read \"<<1>>\"", title)
-
-      -- ZO_AlertNoSuppression(UI_ALERT_CATEGORY_ALERT, nil, )
-
-      local params = CENTER_SCREEN_ANNOUNCE:CreateMessageParams(CSA_CATEGORY_SMALL_TEXT, nil)
-      params:SetText(msg)
-      params:SetCSAType(CENTER_SCREEN_ANNOUNCE_TYPE_LORE_BOOK_LEARNED)
-      params:SetLifespanMS(850)
-      CENTER_SCREEN_ANNOUNCE:AddMessageWithParams(params)
-
-      EndInteraction(INTERACTION_BOOK)
-      return
    end
 
    -- meh, this is copied from the local function in the ZOS code. :(
@@ -107,6 +118,9 @@ local function OnShowBookOverride(eventCode, title, body, medium, showTitle, boo
    else
       EndInteraction(INTERACTION_BOOK)
    end
+end
+
+local function ScanKnowLoreBooks()
 end
 
 local function OnAddonLoaded(_, name)
