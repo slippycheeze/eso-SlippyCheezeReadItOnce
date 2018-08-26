@@ -1,6 +1,6 @@
 -- Copyright © 2018 Daniel Pittman <daniel@rimspace.net>
 -- See LICENSE for more details.
-if _G['SlippyCheezeReadItOnce'] == nil then
+if not SlippyCheezeReadItOnce then
   SlippyCheezeReadItOnce = {
     ADDON_NAME="SlippyCheezeReadItOnce",
     DISPLAY_NAME = "|c798BD2ReadItOnce|r",
@@ -119,19 +119,46 @@ function M:OnShowBookOverride(eventCode, title, body, medium, showTitle, bookId)
   end
 end
 
-local function OnAddonLoaded(_, name)
-  if name ~= ADDON_NAME then return end
-  EVENT_MANAGER:UnregisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED)
+function M:SyncFromArchivementBookHistory()
+  local added = 0
+
+  for category = 1, GetNumLoreCategories() do
+    local _, numCollections, _ = GetLoreCategoryInfo(category)
+    for collection = 1, numCollections do
+      local _, _, _, numBooks, _, _, _ = GetLoreCollectionInfo(category, collection)
+      for book = 1, numBooks do
+        local title, _, known, id = GetLoreBookInfo(category, collection, book)
+        if known then
+          local body = ReadLoreBook(category, collection, book)
+          if not self:HaveSeenBookBefore(id, title, body) then
+            added = added + 1
+            -- msg("book <<1>>: id=<<2>>(<<3>>) title=<<4>>(<<5>>)) body=<<6>>", added, type(id), id, type(title), title, HashString(body))
+          end
+        end
+      end
+    end
+  end
+
+  if added > 0 then
+    -- ZOS quirk: the number **must** be the third argument.  the plural must
+    -- be a substitution of text.
+    msg('added <<2>> <<m:1>> found in your achievements.', 'previously read book', added)
+  end
+end
+
+function M:OnAddonLoaded(name)
+  if name ~= M.ADDON_NAME then return end
+  EVENT_MANAGER:UnregisterForEvent(M.ADDON_NAME, EVENT_ADD_ON_LOADED)
 
   -- if the second argument, the version, changes then the data is wiped and
   -- replaced with the defaults.
-  seen = ZO_SavedVars:NewAccountWide("SlippyCheezeReadItOnceData", 1)
+  self.seen = ZO_SavedVars:NewAccountWide("SlippyCheezeReadItOnceData", 1)
 
   -- replace the original event handler with ours; sadly, we don't have
   -- access to the original implementation to do anything nicer. :/
   LORE_READER.control:UnregisterForEvent(EVENT_SHOW_BOOK)
-  LORE_READER.control:RegisterForEvent(EVENT_SHOW_BOOK, OnShowBookOverride)
+  LORE_READER.control:RegisterForEvent(EVENT_SHOW_BOOK, function(...) self:OnShowBookOverride(...) end)
 end
 
 -- bootstrapping
-EVENT_MANAGER:RegisterForEvent(ADDON_NAME, EVENT_ADD_ON_LOADED, OnAddonLoaded)
+EVENT_MANAGER:RegisterForEvent(M.ADDON_NAME, EVENT_ADD_ON_LOADED, function(_, name) M:OnAddonLoaded(name) end)
