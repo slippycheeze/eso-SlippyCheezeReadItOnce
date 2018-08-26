@@ -8,7 +8,11 @@ if not SlippyCheeze.ReadItOnce then
     NAME="SlippyCheezeReadItOnce",
     DISPLAY_NAME = "|c798BD2ReadItOnce|r",
     -- for double-tap bypass of the block
-    previousBook = {id=nil, time=0},
+    previousBook = {
+      id = nil,
+      time = 0,
+      count = 0,
+    },
     DOUBLE_TAP_TIME = 1000,
     -- used for reporting on our background achievement scan
     async = nil,
@@ -77,14 +81,16 @@ end
 
 -- Called when we want to skip showing a book.  Probably going to be very
 -- strange if you call it any other time!
-function addon:DoNotShowThisBook(title)
+function addon:DoNotShowThisBook(title, onlySound)
   PlaySound(SOUNDS.NEGATIVE_CLICK)
 
-  local params = CENTER_SCREEN_ANNOUNCE:CreateMessageParams(CSA_CATEGORY_SMALL_TEXT, nil)
-  params:SetText(zo_strformat("You have already read \"<<1>>\"", title))
-  params:SetCSAType(CENTER_SCREEN_ANNOUNCE_TYPE_LORE_BOOK_LEARNED)
-  params:SetLifespanMS(850)
-  CENTER_SCREEN_ANNOUNCE:AddMessageWithParams(params)
+  if not onlySound then
+    local params = CENTER_SCREEN_ANNOUNCE:CreateMessageParams(CSA_CATEGORY_SMALL_TEXT, nil)
+    params:SetText(zo_strformat("You have already read \"<<1>>\"", title))
+    params:SetCSAType(CENTER_SCREEN_ANNOUNCE_TYPE_LORE_BOOK_LEARNED)
+    params:SetLifespanMS(850)
+    CENTER_SCREEN_ANNOUNCE:AddMessageWithParams(params)
+  end
 
   EndInteraction(INTERACTION_BOOK)
 end
@@ -104,21 +110,45 @@ function addon:OnShowBookOverride(eventCode, title, body, medium, showTitle, boo
   end
 
   -- seen before, block unless is double-tap within the limit
-  if HaveSeenBookBefore(bookId, title, body) then
-    -- different book from the last time?  block.
-    if self.previousBook.id ~= bookId then
-      return self:DoNotShowThisBook(title)
-    end
+  if self:HaveSeenBookBefore(bookId, title, body) then
+    -- different book from the last time?
+    local sameBook = (self.previousBook.id == bookId)
 
-    -- last book was more than our double-tap time ago?  block.
+    -- last book was more than our double-tap time ago?
     local now = GetGameTimeMilliseconds()
-    if (now - self.previousBook.time) > DOUBLE_TAP_TIME then
+    local timeSinceLastTap = (now - self.previousBook.time)
+    local doubleTap = (timeSinceLastTap <= addon.DOUBLE_TAP_TIME)
+
+    -- if not self.IS_RELEASE_VERSION then
+    --   msg('show-p: sameBook=<<1>> doubleTap=<<2>> count=<<3>> timeSinceLastTap=<<4>>',
+    --       sameBook, doubleTap, self.previousBook.count, timeSinceLastTap)
+    -- end
+
+    if sameBook then
+      -- allow a double-tap after a failed double-tap
+      self.previousBook.time = now
+      -- remember if we are being real spammy here, but reset that tracker if
+      -- they give a long enough pause.
+      if timeSinceLastTap < 3000 then
+        self.previousBook.count = self.previousBook.count + 1
+      else
+        self.previousBook.count = 1
+      end
+
+      if not doubleTap then
+        -- don't keep on yelling if they spam interact too much, just beep.
+        local onlySound = (self.previousBook.count > 1)
+        return self:DoNotShowThisBook(title, onlySound)
+      end
+    else
+      -- otherwise record this state for the future.
+      self.previousBook.id = bookId
+      self.previousBook.count = 1
+      self.previousBook.time = now
+
+      -- and block the book.
       return self:DoNotShowThisBook(title)
     end
-
-    -- otherwise record this state for the future.
-    self.previousBook.id = bookId
-    self.previousBook.time = now
   end
 
   -- meh, this is copied from the local function in the ZOS code. :(
@@ -164,7 +194,7 @@ function addon:ReportAfterLoreScan()
       TIME_FORMAT_STYLE_DESCRIPTIVE_MINIMAL_SHOW_TENTHS_SECS,
       TIME_FORMAT_PRECISION_TENTHS_RELEVANT,
       TIME_FORMAT_DIRECTION_NONE)
-    msg('SyncFromLoreBooks: scan ran for <<1>> total', duration)
+    msg('SyncFromLoreBooks: scan ran for <<1>>', duration)
   end
 end
 
