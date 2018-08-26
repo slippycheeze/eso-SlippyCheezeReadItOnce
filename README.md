@@ -17,6 +17,18 @@ Anything in your inventory, or accessed through the Lore Journal, will display
 normally.  Accessing books through non-standard book collecting addons should
 work normally, but has not been tested.  Please report issues appropriately.
 
+## History is imported from the Lore Collections
+
+All the books that you have discovered, and which are recorded in the Lore
+Collections found in the Journal, are automatically marked as read.
+This won't be able to add all the previously read content, but it should
+include a significant proportion for most players.
+
+Unfortunately, other than the Lore Collections, there is no in-game history
+for what content has been read, so the addon will only be able to "know" that
+you read something after the first time you encounter a non-Collection book
+with it active.
+
 ## Configuration
 
 There is no configuration for the addon.

@@ -36,7 +36,7 @@ fi
 root=${PWD?}
 addon=${${(s:/:)PWD?}[-1]}
 manifest=${addon}.txt
-distdir=${HOME}/Documents/esoui-release
+distdir=${HOME}/wslhome/Documents/esoui-release
 
 release=${PWD?}/release
 mkdir -p ${release}
