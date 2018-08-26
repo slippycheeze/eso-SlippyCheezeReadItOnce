@@ -6,6 +6,9 @@
 ## APIVersion: 100024
 ## SavedVariables: SlippyCheezeReadItOnceData
 ## DependsOn: LibStub LibAsync
+##
+## X-VendorAddon: LibStub 44
+## Sadly, can't vendor LibAsync, no upstream ESOUI location for it. :/
 
 SlippyCheezeReadItOnce.lua
 

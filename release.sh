@@ -1,6 +1,9 @@
 #!/usr/bin/env zsh
 #
 # Create a release zip file ready for pushing to esoui
+set -e
+set +u
+set WARN_CREATE_GLOBAL
 
 function log() {echo "release: $*"; }
 function die() { log "$@" >&2;  exit 1; }
@@ -8,6 +11,15 @@ function die() { log "$@" >&2;  exit 1; }
 # check we have the tools we need
 [[ -x =git-chglog ]] || die "the (golang) git-chglog tool is missing"
 [[ -x =md2bbcode ]] || die "the md2bbcode script is missing"
+[[ -x =jq ]] || die "the jq utility is missing"
+[[ -x =curl ]] || die "curl is missing"
+
+# grab the ESOUI token from the git config
+token="X-API-Token: $(git config esoui.token)"
+if [[ $? > 0 || ${token} == 'X-API-Token: ' ]]; then
+  die "git config esoui.token failed: '${esoui_token:-not found in config file}'"
+fi
+
 
 IS_RELEASE_VERSION='true'
 if [[ $1 == test ]]; then
@@ -108,10 +120,42 @@ perl -p -e 'BEGIN { $v=shift; } s/^## (AddOn)?Version:.*$/## \1Version: $v/' \
 done
 
 # add any embedded libraries wholesale!
-log "shipping embedded libraries"
+log "shipping local embedded libraries"
 for embed in [lL]ib*/**/*(.); do
   log "embed ${embed}"
   cp --parents ${embed} ${build}
+done
+
+log "fetching remote embedded libraries"
+< ${manifest} while read _ tag name id _; do
+  if [[ ${tag:l} == x-vendoraddon: ]]; then
+    if [[ -z ${name} || -z ${id} ]]; then
+      die "missing name or id for vendoring from esoui: [${name}] [${id}]"
+    fi
+
+    log "fetching release information for ${id}:${name}"
+    data=$(curl -sSLH ${token} https://api.esoui.com/addons/details/${id}.json)
+
+    json_id=$(jq -M -r '.[0].id' <<<${data})
+    if [[ ${id} != ${json_id} ]]; then
+      die "vendoring ${id}:${name} - remote {id: '${json_id}'} does not match"
+    fi
+
+    json_name=$(jq -M -r '.[0].title' <<<${data})
+    if [[ ${name} != ${json_name} ]]; then
+      die "vendoring ${id}:${name} - remote {title: '${json_name}'} does not match"
+    fi
+
+    json_filename=$(jq -M -r '.[0].filename' <<<${data})
+    if [[ ${json_filename} != ${name}*.zip ]]; then
+      die "vendoring ${id}:${name} - remote {filename: '${json_filename}'} does not match expectations"
+    fi
+
+    # we actually have a validated set of data, and a filename, fetch it down
+    # and unpack into the build directory!
+    log "downloading ${json_id}:${json_name} from ${json_filename} and unpacking"
+    unzip -bD =(curl -L -H ${token} http://www.esoui.com/downloads/dl${id}/${json_filename}) -d ${build}
+  fi
 done
 
 # generate the changelog and description files
