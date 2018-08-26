@@ -199,6 +199,10 @@ function addon:ReportAfterLoreScan()
 end
 
 function addon:SyncFromLoreBooks()
+  if not self.IS_RELEASE_VERSION then
+    msg('SyncFromLoreBooks: starting lore book scan now')
+  end
+
   self.async = LibStub("LibAsync"):Create(self.NAME)
 
   self.lore.added = 0
@@ -226,9 +230,13 @@ function addon:OnAddonLoaded(name)
   -- and once we actually log in, scan the collections for missing records in
   -- our data on what we have seen, since this is the only in-game history we
   -- can use...
+  --
+  -- When the player logs in, we delay for ten seconds, then perform
+  -- the scan.  That gives the system a chance to settle down from all the
+  -- other addons that want to do something at login as well...
   local function SyncFromLoreBooksShim(...)
     EVENT_MANAGER:UnregisterForEvent(addon.NAME, EVENT_PLAYER_ACTIVATED)
-    addon:SyncFromLoreBooks()
+    zo_callLater(function() addon:SyncFromLoreBooks() end, 10000 --[[ 10s an ms --]])
   end
   EVENT_MANAGER:RegisterForEvent(addon.NAME, EVENT_PLAYER_ACTIVATED, SyncFromLoreBooksShim)
 end
