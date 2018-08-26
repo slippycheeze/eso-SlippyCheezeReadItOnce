@@ -5,6 +5,7 @@
 ## AddOnVersion: 1000000
 ## APIVersion: 100024
 ## SavedVariables: SlippyCheezeReadItOnceData
+## DependsOn: LibStub LibAsync
 
 SlippyCheezeReadItOnce.lua
 
