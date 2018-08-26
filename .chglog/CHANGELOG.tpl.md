@@ -20,7 +20,7 @@
 
 {{ range .Versions }}
 {{ if .Tag.Previous -}}
-## [{{ .Tag.Name }}][diff-{{ .Tag.Name }}] - {{ datetime "2006-01-02" .Tag.Date }}
+## [Release {{ .Tag.Name }} - {{ datetime "2006-01-02" .Tag.Date }}][diff-{{ .Tag.Name }}]
 {{ else -}}
 ## {{ .Tag.Name }} - {{ datetime "2006-01-02" .Tag.Date }}
 {{ end -}}
