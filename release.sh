@@ -9,21 +9,27 @@ function die() { log "$@" >&2;  exit 1; }
 [[ -x =git-chglog ]] || die "the (golang) git-chglog tool is missing"
 [[ -x =md2bbcode ]] || die "the md2bbcode script is missing"
 
-# check we are at the head of the current branch?
-if [[ $(git rev-parse master) != $(git rev-parse HEAD) ]]; then
-  die "not currently at the head of branch 'master'"
-fi
+test_build=0
+if [[ $1 == test ]]; then
+  test_build=1
+  tag=$(date +%s)
+else
+  # check we are at the head of the current branch?
+  if [[ $(git rev-parse master) != $(git rev-parse HEAD) ]]; then
+    die "not currently at the head of branch 'master'"
+  fi
 
-tag=($(git tag --list --points-at master))
-tag=(${(@n)tag})                # sort tags
-case ${#tag} in
-  0) die "current 'master' is not tagged"; ;;
-  1) ;;  # success, this is what we want!
-  *) die "current 'master' has more than one tag: ${tag}"; ;;
-esac
+  tag=($(git tag --list --points-at master))
+  tag=(${(@n)tag})                # sort tags
+  case ${#tag} in
+    0) die "current 'master' is not tagged"; ;;
+    1) ;;  # success, this is what we want!
+    *) die "current 'master' has more than one tag: ${tag}"; ;;
+  esac
 
-if [[ ! ( $tag =~ ^[0-9]+$ ) ]]; then
-  die "current 'master' is tagged '${tag}', but must be tagged with an integer"
+  if [[ ! ( $tag =~ ^[0-9]+$ ) ]]; then
+    die "current 'master' is tagged '${tag}', but must be tagged with an integer"
+  fi
 fi
 
 # figure out the addon name, and build directory
@@ -31,16 +37,22 @@ root=${PWD?}
 addon=${${(s:/:)PWD?}[-1]}
 manifest=${addon}.txt
 distdir=${HOME}/Documents/esoui-release
-zipfile=${addon}-${tag}.zip
+
+release=${PWD?}/release
+mkdir -p ${release}
+
+if (( test_build )); then
+  zipfile=test-${addon}.zip
+  rm -f ${release}/${zipfile}
+else
+  zipfile=${addon}-${tag}.zip
+fi
 
 # logic for building the version we package for esoui
 log "building the release version of ${addon}"
 build=${PWD?}/build/${addon}
 [[ -d ${build} ]] && rm -rf ${build}
 mkdir -p ${build}
-
-release=${PWD?}/release
-mkdir -p ${release}
 
 function ship() {
   for file in $@; do
@@ -79,7 +91,11 @@ git chglog | tee ${build}/changelog.md | md2bbcode > CHANGELOG.bbcode
 log "creating the ESOUI distribution package ${zipfile}"
 (cd ${build}/.. && test -d ${addon} && zip -9TXr ${release}/${zipfile} ${addon})
 
+if (( test_build )); then
+  log "fully built, in test mode"
+  exit 0
+fi
+
 log "fully build, adding to distdir"
 cp ${release}/${zipfile} ${distdir}
-
 log "now upload your addon..."
