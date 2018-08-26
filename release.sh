@@ -9,9 +9,9 @@ function die() { log "$@" >&2;  exit 1; }
 [[ -x =git-chglog ]] || die "the (golang) git-chglog tool is missing"
 [[ -x =md2bbcode ]] || die "the md2bbcode script is missing"
 
-test_build=0
+IS_RELEASE_VERSION='true'
 if [[ $1 == test ]]; then
-  test_build=1
+  IS_RELEASE_VERSION='false'
   tag=$(date +%s)
 else
   # check we are at the head of the current branch?
@@ -41,7 +41,7 @@ distdir=${HOME}/Documents/esoui-release
 release=${PWD?}/release
 mkdir -p ${release}
 
-if (( test_build )); then
+if [[ $IS_RELEASE_VERSION == false ]]; then
   zipfile=test-${addon}.zip
   rm -f ${release}/${zipfile}
 else
@@ -49,16 +49,42 @@ else
 fi
 
 # logic for building the version we package for esoui
-log "building the release version of ${addon}"
+log "building ${addon} with release=${IS_RELEASE_VERSION}"
 build=${PWD?}/build/${addon}
 [[ -d ${build} ]] && rm -rf ${build}
 mkdir -p ${build}
 
+function verify() {
+  log "verify '$@'"
+  output=$($@ >&1)
+  if (( $? > 0 )); then
+    die "${output}"
+  fi
+  return 0
+}
+
+function check_lua() {
+  luac -p ${1} || die ${2}
+}
+
 function ship() {
-  for file in $@; do
-    log "shipping '${file}'"
-    cp --parents ${file} ${build}
-  done
+  case $1 in
+    (*.lua)
+      log "ship ${1} with IS_RELEASE_VERSION=${IS_RELEASE_VERSION}"
+      # make sure it was good before we started
+      check_lua ${1} "${1} was corrupted before shipping"
+      # we burn in the release type on the way
+      mkdir --parents ${${~1}:h}
+      perl -p -e 'BEGIN { $irv=shift; } s/(IS_RELEASE_VERSION *= *)(?:true|false)/$1$irv/' \
+           -- ${IS_RELEASE_VERSION} < ${1} > ${build}/${1}
+      # ...and make sure we didn't screw it up.
+      check_lua ${build}/${1} "${1} was corrupted after shipping"
+      ;;
+    (*)
+      log "copy ${1}"
+      cp --parents ${1} ${build}
+      ;;
+  esac
 }
 
 # ship the manifest
@@ -72,9 +98,20 @@ perl -p -e 'BEGIN { $v=shift; } s/^## (AddOn)?Version:.*$/## \1Version: $v/' \
 < ${manifest} while read file; do
   file=${file%%#*}
   file=${file//[[:cntrl:]]/}
-  if [[ -n $file && -f $file ]]; then
-    ship ${file}
+  if [[ -n $file ]]; then
+    if [[ -f $file ]]; then
+      ship ${file}
+    else
+      log "skipping !-f file: ${(qq)file}"
+    fi
   fi
+done
+
+# add any embedded libraries wholesale!
+log "shipping embedded libraries"
+for embed in [lL]ib*/**/*(.); do
+  log "embed ${embed}"
+  cp --parents ${embed} ${build}
 done
 
 # generate the changelog and description files
@@ -91,7 +128,7 @@ git chglog | tee ${build}/changelog.md | md2bbcode > CHANGELOG.bbcode
 log "creating the ESOUI distribution package ${zipfile}"
 (cd ${build}/.. && test -d ${addon} && zip -9TXr ${release}/${zipfile} ${addon})
 
-if (( test_build )); then
+if [[ $IS_RELEASE_VERSION == false ]]; then
   log "fully built, in test mode"
   exit 0
 fi
